@@ -74,17 +74,6 @@ class ContextFreeGrammar {
     #eliminateLeftRecursion() {
         for (const nonterminal of this.order) {
             this.#expandRules(nonterminal);
-            console.log(this.grammar)
-            if (this.#isLeftRecursive(nonterminal, this.grammar[nonterminal])) {
-                this.#removeDirectLeftRecursion(nonterminal);
-            }
-            // Aca crea una funcion para factorizar 
-        }
-    }
-
-    #eliminateLeftRecursion() {
-        for (const nonterminal of this.order) {
-            this.#expandRules(nonterminal);
             if (this.#isLeftRecursive(nonterminal, this.grammar[nonterminal])) {
                 this.#removeDirectLeftRecursion(nonterminal);
             }
