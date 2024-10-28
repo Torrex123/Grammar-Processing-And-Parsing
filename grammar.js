@@ -77,14 +77,70 @@ class ContextFreeGrammar {
             if (this.#isLeftRecursive(nonterminal, this.grammar[nonterminal])) {
                 this.#removeDirectLeftRecursion(nonterminal);
             }
-            this.#leftFactoring(nonterminal) // funcion para factorizar 
+            this.#leftFactoring(nonterminal)  
         }
     }
 
     #leftFactoring(nonterminal) {
-
+        const productions = Array.from(this.grammar[nonterminal]);
+    
+        const commonPrefix = (productions) => {
+            const symbols = productions.map(production => this.#splitSymbols(production));
+    
+            if (symbols.length < 2) return ""; 
+            
+            const findCommonPrefix = (arr1, arr2) => {
+                let common = [];
+                let minLength = Math.min(arr1.length, arr2.length); 
+                for (let i = 0; i < minLength; i++) {
+                    if (arr1[i] !== arr2[i]) break;
+                    common.push(arr1[i]);
+                }
+                return common;
+            };
+        
+            let longestPrefix = [];
+            for (let i = 0; i < symbols.length; i++) {
+                for (let j = i + 1; j < symbols.length; j++) {
+                    let currentPrefix = findCommonPrefix(symbols[i], symbols[j]);
+                    if (currentPrefix.length > longestPrefix.length) {
+                        longestPrefix = currentPrefix;
+                    }
+                }
+            }
+    
+            return longestPrefix.join("");
+        };
+    
+        let prefix;
+        while ((prefix = commonPrefix(productions)).length > 0) {
+            const newNonterminal = this.#generateNewNonterminal(nonterminal);
+            const newProductions = new Set();
+            const updatedProductions = new Set();
+    
+            productions.forEach(production => {
+                if (production.startsWith(prefix)) {
+                    const remainder = production.slice(prefix.length);
+                    if (remainder === "") {
+                        newProductions.add("&"); 
+                    } else {
+                        newProductions.add(remainder);
+                    }
+                    updatedProductions.add(prefix + newNonterminal);
+                } else {
+                    updatedProductions.add(production); 
+                }
+            });
+    
+            this.grammar[nonterminal] = updatedProductions;
+            this.grammar[newNonterminal] = newProductions;
+    
+            
+            productions.length = 0; 
+            productions.push(...updatedProductions);
+        }
     }
-
+    
     #removeDirectLeftRecursion(nonterminal) {
         const newNonterminal = this.#generateNewNonterminal(nonterminal);
         const rules = new Set();
@@ -201,4 +257,19 @@ A->d
 B->a
 B->aB`;
 
-console.log(new ContextFreeGrammar(gic3))
+const gic6 = `P->a
+P->iEtP
+P->iEtPeP
+E->b`;
+
+const gic7 = `A->abcde
+A->abcB
+A->B
+B->d`;
+
+const gic8 = `P->abc
+P->abcd
+P->ab`;
+
+
+console.log(new ContextFreeGrammar(gic8))
