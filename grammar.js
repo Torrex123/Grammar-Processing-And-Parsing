@@ -86,8 +86,7 @@ class ContextFreeGrammar {
         this.#calculateFirstSet()
         this.#calculateFollowSet()
         this.#table()
-        const result = this.ASDalgorithm("abc");
-        console.log(result)
+        const result = this.ASDalgorithm("id,(id)");
     }
 
     #leftFactoring(nonterminal) {
@@ -231,27 +230,22 @@ class ContextFreeGrammar {
     }
 
     #calculateFirstSet() {
-        // Step 1: Initialize a set for each nonterminal
         const firstSet = {};
         for (const nonterminal of this.order) {
             firstSet[nonterminal] = new Set();
         }
     
-        // Step 2: Compute First sets
         const computeFirst = (symbol) => {
 
             if (!this.#isNonterminal(symbol)) {
-                // If it's a terminal, return a set with the terminal
                 return new Set([symbol]);
             }
     
-            // If it's a nonterminal and already computed, return the cached First set
             const result = firstSet[symbol];
             if (result.size > 0) {
                 return result;
             }
     
-            // Otherwise, compute First set for the nonterminal
             for (const rule of this.grammar[symbol]) {
                 const symbols = this.#splitSymbols(rule);
                 let i = 0;
@@ -270,7 +264,6 @@ class ContextFreeGrammar {
             return result;
         };
     
-        // Step 3: Compute First sets for all nonterminals
         for (const nonterminal of this.order) {
             computeFirst(nonterminal);
         }
@@ -281,40 +274,33 @@ class ContextFreeGrammar {
     
     #calculateFollowSet() {
 
-        // Step 1: Initialize a set for each nonterminal
         const followSet = {};
         for (const nonterminal of this.order) {
             followSet[nonterminal] = new Set();
         }
     
-        // Add `$` to the Follow set of the start symbol
         followSet[this.order[0]].add('$');
     
-        // Helper function to add elements of one set to another
+
         const addSet = (targetSet, sourceSet) => {
             for (const item of sourceSet) {
                 targetSet.add(item);
             }
         };
     
-        // Step 2: Compute Follow sets iteratively
         let changed = true;
         while (changed) {
             changed = false;
-            // Iterate through all productions in the grammar
             for (const nonterminal of this.order) {
                 for (const rule of this.grammar[nonterminal]) {
                     const symbols = this.#splitSymbols(rule);
     
-                    // Traverse each symbol in the rule
                     for (let i = 0; i < symbols.length; i++) {
                         const symbol = symbols[i];
                         if (this.#isNonterminal(symbol)) {
-                            // Case 1: Check the symbol to the right of the current nonterminal
                             if (i + 1 < symbols.length) {
                                 const nextSymbol = symbols[i + 1];
                                 if (this.#isNonterminal(nextSymbol)) {
-                                    // Add First(nextSymbol) to Follow(symbol), excluding '&'
                                     const firstSetOfNext = this.firsts[nextSymbol];
                                     const beforeChangeSize = followSet[symbol].size;
                                     for (const item of firstSetOfNext) {
@@ -326,7 +312,6 @@ class ContextFreeGrammar {
                                         changed = true;
                                     }
                                 } else {
-                                    // If next symbol is a terminal, add it to Follow(symbol)
                                     const beforeChangeSize = followSet[symbol].size;
                                     followSet[symbol].add(nextSymbol);
                                     if (followSet[symbol].size > beforeChangeSize) {
@@ -335,7 +320,6 @@ class ContextFreeGrammar {
                                 }
                             }
     
-                            // Case 2: If the symbol is at the end or the remaining symbols can derive epsilon
                             if (i + 1 === symbols.length || symbols.slice(i + 1).every(s => this.firsts[s]?.has('&'))) {
                                 const beforeChangeSize = followSet[symbol].size;
                                 addSet(followSet[symbol], followSet[nonterminal]);
@@ -365,7 +349,6 @@ class ContextFreeGrammar {
             for (const rule of this.grammar[nonterminal]) {
                 const symbols = this.#splitSymbols(rule);
 
-                // Case 0: the rule derives epsilon
                 if (symbols[0] === '&') {
                     for (const terminal of this.follows[nonterminal]) {
                         m[nonterminal][terminal] = rule;
@@ -373,19 +356,15 @@ class ContextFreeGrammar {
                     continue;
                 }
 
-                // Case 1: the first symbol is a terminal
                 if (!this.#isNonterminal(symbols[0])) {
                     const terminal = symbols[0];
                     m[nonterminal][terminal] = rule;
                     continue;
                 }
 
-                // Case 2: the first symbol is a nonterminal
                 const firstSet = this.firsts[symbols[0]];
                 
-                //case 2.1: the first symbol can derive epsilon
                 if (firstSet.has('&')) {
-                    // Make an union of First(symbol) without epsilon and Follow(nonterminal)
                     const withoutEpsilon = new Set(firstSet);
                     withoutEpsilon.delete('&');
                     const followSet = this.follows[nonterminal];
@@ -393,7 +372,6 @@ class ContextFreeGrammar {
                     for (const terminal of union) {
                         m[nonterminal][terminal] = rule;
                     }
-                //case 2.2: the first symbol can't derive epsilon
                 } else {
                     for (const terminal of firstSet) {
                         m[nonterminal][terminal] = rule;
@@ -415,7 +393,6 @@ class ContextFreeGrammar {
             return `${stack.join("")}\t${input}\t${production}\n`;
         };
         
-        // Split symbols in a rule, considering the possibility of a symbol being a nonterminal with a prime
         const splitSymbols = (rule) => {
             const symbols = [];
             let i = 0;
@@ -431,7 +408,6 @@ class ContextFreeGrammar {
             return symbols;
         };
         
-        // Update the stack with the symbols of a rule
         const updateStack = (rule) => {
             if (rule !== "&") { 
                 const symbols = splitSymbols(rule);
@@ -448,7 +424,6 @@ class ContextFreeGrammar {
             var currentInput = input[0];
             let production = "";
 
-            // Case 1: The top of the stack is a terminal
             if (this.#isNonterminal(currentSymbol)) {
                 const rule = table[currentSymbol][currentInput];
                 if (!rule) {
@@ -459,7 +434,6 @@ class ContextFreeGrammar {
                 process += formatState([...stack], input, production);
                 stack.pop(); 
                 updateStack(rule);
-            // Case 2: The top of the stack is a terminal
             } else {
                 process += formatState([...stack], input, production);
                 input = input.slice(1);
@@ -524,5 +498,14 @@ T->F
 F->(E)
 F->id`;
 
+const gic10 = `S->S,T
+S->T
+T->id
+T->id(S)`;
 
-console.log(new ContextFreeGrammar(gic4));
+grammar = new ContextFreeGrammar(gic10);
+test = grammar.ASDalgorithm("id,(id)");
+
+console.log(grammar);
+console.log(test);
+
