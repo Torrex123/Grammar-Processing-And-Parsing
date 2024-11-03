@@ -4,6 +4,9 @@ class ContextFreeGrammar {
         this.terminals = new Set()
         this.grammar = {}
         this.order = []
+        this.firsts = {}
+        this.follows = {}
+        this.table = {}
 
         this.#parseGrammar(cfg)
         this.#eliminateLeftRecursion()
@@ -79,6 +82,10 @@ class ContextFreeGrammar {
             }
             this.#leftFactoring(nonterminal)  
         }
+
+        this.#calculateFirstSet()
+        this.#calculateFollowSet()
+        this.#table()
     }
 
     #leftFactoring(nonterminal) {
@@ -135,7 +142,6 @@ class ContextFreeGrammar {
             this.grammar[nonterminal] = updatedProductions;
             this.grammar[newNonterminal] = newProductions;
     
-            
             productions.length = 0; 
             productions.push(...updatedProductions);
         }
@@ -222,6 +228,180 @@ class ContextFreeGrammar {
         }
     }
 
+    #calculateFirstSet() {
+        // Step 1: Initialize a set for each nonterminal
+        const firstSet = {};
+        for (const nonterminal of this.order) {
+            firstSet[nonterminal] = new Set();
+        }
+    
+        // Step 2: Compute First sets
+        const computeFirst = (symbol) => {
+
+            if (!this.#isNonterminal(symbol)) {
+                // If it's a terminal, return a set with the terminal
+                return new Set([symbol]);
+            }
+    
+            // If it's a nonterminal and already computed, return the cached First set
+            const result = firstSet[symbol];
+            if (result.size > 0) {
+                return result;
+            }
+    
+            // Otherwise, compute First set for the nonterminal
+            for (const rule of this.grammar[symbol]) {
+                const symbols = this.#splitSymbols(rule);
+                let i = 0;
+                while (i < symbols.length) {
+                    const firstOfCurrent = computeFirst(symbols[i]);
+                    for (const item of firstOfCurrent) {
+                        result.add(item);
+                    }
+                    if (!firstOfCurrent.has('&')) {
+                        break;
+                    }
+                    i++;
+                }
+            }
+
+            return result;
+        };
+    
+        // Step 3: Compute First sets for all nonterminals
+        for (const nonterminal of this.order) {
+            computeFirst(nonterminal);
+        }
+    
+        this.firsts = firstSet;
+        return firstSet;
+    }
+    
+    #calculateFollowSet() {
+        // Step 1: Initialize a set for each nonterminal
+        const followSet = {};
+        for (const nonterminal of this.order) {
+            followSet[nonterminal] = new Set();
+        }
+    
+        // Add `$` to the Follow set of the start symbol
+        followSet[this.order[0]].add('$');
+    
+        // Helper function to add elements of one set to another
+        const addSet = (targetSet, sourceSet) => {
+            for (const item of sourceSet) {
+                targetSet.add(item);
+            }
+        };
+    
+        // Step 2: Compute Follow sets iteratively
+        let changed = true;
+        while (changed) {
+            changed = false;
+            // Iterate through all productions in the grammar
+            for (const nonterminal of this.order) {
+                for (const rule of this.grammar[nonterminal]) {
+                    const symbols = this.#splitSymbols(rule);
+    
+                    // Traverse each symbol in the rule
+                    for (let i = 0; i < symbols.length; i++) {
+                        const symbol = symbols[i];
+                        if (this.#isNonterminal(symbol)) {
+                            // Case 1: Check the symbol to the right of the current nonterminal
+                            if (i + 1 < symbols.length) {
+                                const nextSymbol = symbols[i + 1];
+                                if (this.#isNonterminal(nextSymbol)) {
+                                    // Add First(nextSymbol) to Follow(symbol), excluding '&'
+                                    const firstSetOfNext = this.firsts[nextSymbol];
+                                    const beforeChangeSize = followSet[symbol].size;
+                                    for (const item of firstSetOfNext) {
+                                        if (item !== '&') {
+                                            followSet[symbol].add(item);
+                                        }
+                                    }
+                                    if (followSet[symbol].size > beforeChangeSize) {
+                                        changed = true;
+                                    }
+                                } else {
+                                    // If next symbol is a terminal, add it to Follow(symbol)
+                                    const beforeChangeSize = followSet[symbol].size;
+                                    followSet[symbol].add(nextSymbol);
+                                    if (followSet[symbol].size > beforeChangeSize) {
+                                        changed = true;
+                                    }
+                                }
+                            }
+    
+                            // Case 2: If the symbol is at the end or the remaining symbols can derive epsilon
+                            if (i + 1 === symbols.length || symbols.slice(i + 1).every(s => this.firsts[s]?.has('&'))) {
+                                const beforeChangeSize = followSet[symbol].size;
+                                addSet(followSet[symbol], followSet[nonterminal]);
+                                if (followSet[symbol].size > beforeChangeSize) {
+                                    changed = true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    
+        this.follows = followSet;
+        return followSet;
+    }
+
+    #table() {
+
+        const m = {};
+    
+        for (const nonterminal of this.order) {
+            m[nonterminal] = {}; 
+        }
+
+        for (const nonterminal of this.order) {
+            for (const rule of this.grammar[nonterminal]) {
+                const symbols = this.#splitSymbols(rule);
+
+                if (symbols[0] === '&') {
+                    for (const terminal of this.follows[nonterminal]) {
+                        m[nonterminal][terminal] = rule;
+                    }
+                    continue;
+                }
+
+                // Case 1: the first symbol is a terminal
+                if (!this.#isNonterminal(symbols[0])) {
+                    const terminal = symbols[0];
+                    m[nonterminal][terminal] = rule;
+                    continue;
+                }
+
+                // Case 2: the first symbol is a nonterminal
+                const firstSet = this.firsts[symbols[0]];
+                
+                //case 2.1: the first symbol can derive epsilon
+                if (firstSet.has('&')) {
+                    // Make an union of First(symbol) without epsilon and Follow(nonterminal)
+                    const withoutEpsilon = new Set(firstSet);
+                    withoutEpsilon.delete('&');
+                    const followSet = this.follows[nonterminal];
+                    const union = new Set([...withoutEpsilon, ...followSet]);
+                    for (const terminal of union) {
+                        m[nonterminal][terminal] = rule;
+                    }
+                //case 2.2: the first symbol can't derive epsilon
+                } else {
+                    for (const terminal of firstSet) {
+                        m[nonterminal][terminal] = rule;
+                    }
+                }
+            }
+        }
+    
+        // Store the table in the class for future use
+        this.table = m;
+        return m;
+    }
 }
 
 const gic1 = `S->(L)
@@ -271,5 +451,12 @@ const gic8 = `P->abc
 P->abcd
 P->ab`;
 
+const gic9 = `E->E+T
+E->T
+T->T*F
+T->F
+F->(E)
+F->id`;
 
-console.log(new ContextFreeGrammar(gic8))
+
+console.log(new ContextFreeGrammar(gic9));
