@@ -86,6 +86,8 @@ class ContextFreeGrammar {
         this.#calculateFirstSet()
         this.#calculateFollowSet()
         this.#table()
+        const result = this.ASDalgorithm("abac");
+        console.log(result)
     }
 
     #leftFactoring(nonterminal) {
@@ -362,6 +364,7 @@ class ContextFreeGrammar {
             for (const rule of this.grammar[nonterminal]) {
                 const symbols = this.#splitSymbols(rule);
 
+                // Case 0: the rule derives epsilon
                 if (symbols[0] === '&') {
                     for (const terminal of this.follows[nonterminal]) {
                         m[nonterminal][terminal] = rule;
@@ -401,6 +404,65 @@ class ContextFreeGrammar {
         // Store the table in the class for future use
         this.table = m;
         return m;
+    }
+
+    ASDalgorithm(input) {
+        const stack = ["$", this.order[0]];
+        input = input + "$";
+        const table = this.table;
+    
+        const formatState = (stack, input, production) => {
+            return `${stack.join("")}\t${input}\t${production}\n`;
+        };
+        
+        const splitSymbols = (rule) => {
+            const symbols = [];
+            let i = 0;
+            while (i < rule.length) {
+                if (i < rule.length - 1 && rule[i + 1] === "'") {
+                    symbols.push(rule[i] + "'");
+                    i += 2;
+                } else {
+                    symbols.push(rule[i]);
+                    i++;
+                }
+            }
+            return symbols;
+        };
+    
+        const updateStack = (rule) => {
+            if (rule !== "&") { 
+                const symbols = splitSymbols(rule);
+                for (let i = symbols.length - 1; i >= 0; i--) {
+                    stack.push(symbols[i]);
+                }
+            }
+        };
+    
+        let process = "Stack\tInput\tOutput\n";
+    
+        while (stack.length > 0) {
+            var currentSymbol = stack[stack.length - 1];
+            var currentInput = input[0];
+            let production = "";
+
+            if (this.#isNonterminal(currentSymbol)) {
+                const rule = table[currentSymbol][currentInput];
+                if (!rule) {
+                    process += formatState([...stack], input, 'Error');
+                    return process;
+                }
+                production = `${currentSymbol} -> ${rule}`;
+                process += formatState([...stack], input, production);
+                stack.pop(); 
+                updateStack(rule);
+            } else {
+                process += formatState([...stack], input, production);
+                input = input.slice(1);
+                stack.pop();
+            }
+        }
+        return process;
     }
 }
 
@@ -459,4 +521,4 @@ F->(E)
 F->id`;
 
 
-console.log(new ContextFreeGrammar(gic9));
+console.log(new ContextFreeGrammar(gic4));
