@@ -86,7 +86,7 @@ class ContextFreeGrammar {
         this.#calculateFirstSet()
         this.#calculateFollowSet()
         this.#table()
-        const result = this.ASDalgorithm("abac");
+        const result = this.ASDalgorithm("abc");
         console.log(result)
     }
 
@@ -280,6 +280,7 @@ class ContextFreeGrammar {
     }
     
     #calculateFollowSet() {
+
         // Step 1: Initialize a set for each nonterminal
         const followSet = {};
         for (const nonterminal of this.order) {
@@ -401,7 +402,6 @@ class ContextFreeGrammar {
             }
         }
     
-        // Store the table in the class for future use
         this.table = m;
         return m;
     }
@@ -415,6 +415,7 @@ class ContextFreeGrammar {
             return `${stack.join("")}\t${input}\t${production}\n`;
         };
         
+        // Split symbols in a rule, considering the possibility of a symbol being a nonterminal with a prime
         const splitSymbols = (rule) => {
             const symbols = [];
             let i = 0;
@@ -429,7 +430,8 @@ class ContextFreeGrammar {
             }
             return symbols;
         };
-    
+        
+        // Update the stack with the symbols of a rule
         const updateStack = (rule) => {
             if (rule !== "&") { 
                 const symbols = splitSymbols(rule);
@@ -446,6 +448,7 @@ class ContextFreeGrammar {
             var currentInput = input[0];
             let production = "";
 
+            // Case 1: The top of the stack is a terminal
             if (this.#isNonterminal(currentSymbol)) {
                 const rule = table[currentSymbol][currentInput];
                 if (!rule) {
@@ -456,6 +459,7 @@ class ContextFreeGrammar {
                 process += formatState([...stack], input, production);
                 stack.pop(); 
                 updateStack(rule);
+            // Case 2: The top of the stack is a terminal
             } else {
                 process += formatState([...stack], input, production);
                 input = input.slice(1);
